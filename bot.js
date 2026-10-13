@@ -1,3 +1,8 @@
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req,res) => res.send('GenNextTech Bot ONLINE - Full Menu Active'));
+app.listen(PORT, () => console.log(`Port ${PORT} Open - Render OK`));
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys')
 const P = require('pino')
 const fs = require('fs')
@@ -148,10 +153,37 @@ async function deployCustomerBot(customerJid, botName) {
 
 async function startMain(){
   const { state, saveCreds } = await useMultiFileAuthState('./session_main')
-  const sock = makeWASocket({ auth: state, logger: P({ level: 'silent' }), browser: ['GenNextTech Main','Chrome','1.0.0'], printQRInTerminal: true })
+  const sock = makeWASocket({
+    auth: state,
+    logger: P({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: ['GenNextTech Bot','Chrome','1.0']
+  })
   global.mainSock=sock
+
+  sock.ev.on('connection.update', async (u)=>{
+    const { qr, connection, lastDisconnect } = u
+    if(qr){
+      console.log('--- SCAN QR BELOW ---')
+      const qrcode = require('qrcode-terminal')
+      qrcode.generate(qr, {small:true})
+      console.log('QR String:', qr)
+    }
+    if(connection==='open'){
+      console.log('✅ MAIN BOT ONLINE')
+      try{
+        const creds = fs.readFileSync('./session_main/creds.json')
+        const b64 = Buffer.from(creds).toString('base64')
+        console.log('SESSION_ID:'+b64)
+      }catch(e){}
+    }
+    if(connection==='close' && lastDisconnect?.error?.output?.statusCode!= 401){
+      console.log('Reconnecting...')
+      setTimeout(()=>startMain(),3000)
+    }
+  })
+
   sock.ev.on('creds.update', saveCreds)
-  sock.ev.on('connection.update', (u)=>{ if(u.connection==='close' && u.lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut) startMain(); if(u.connection==='open') console.log("✅ MAIN ONLINE - Autostatus:", SETTINGS.autostatus) })
   sock.ev.on('messages.upsert', async ({messages})=>{
     const m=messages[0]; if(!m.message || m.key.fromMe) return
     if(m.key.remoteJid === 'status@broadcast'){

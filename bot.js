@@ -3,7 +3,20 @@ const P = require('pino')
 const fs = require('fs')
 const axios = require('axios')
 const config = require('./config')
-
+// --- SESSION ID RESTORE FOR RENDER ---
+if (process.env.SESSION_ID) {
+  try {
+    if (!fs.existsSync('./session_main')) fs.mkdirSync('./session_main', { recursive: true });
+    let sessionData = process.env.SESSION_ID;
+    // Support both GenNextTech_xxx and raw base64
+    if (sessionData.startsWith('GenNextTech_')) sessionData = sessionData.replace('GenNextTech_', '');
+    const creds = Buffer.from(sessionData, 'base64').toString();
+    fs.writeFileSync('./session_main/creds.json', creds);
+    console.log('✅ SESSION_ID restored from env');
+  } catch (e) {
+    console.log('❌ Failed to restore SESSION_ID:', e.message);
+  }
+}
 async function apiCall(action, data = {}) {
   try {
     const res = await axios.post(config.apiUrl, { secret: config.apiSecret, action,...data });
